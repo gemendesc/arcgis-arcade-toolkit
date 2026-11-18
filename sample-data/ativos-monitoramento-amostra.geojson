@@ -1,0 +1,132 @@
+{
+  "type": "FeatureCollection",
+  "name": "ativos_monitoramento_socioambiental_amostra",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "codigo_ativo": "MON-AMZ-001",
+        "nome_ativo": "Bloco Exploratório Solimões Oriental BM-SOL-14",
+        "tipologia": "Óleo & Gás Onshore",
+        "uf": "AM",
+        "cd_mun": "1300607",
+        "nm_mun": "Barcelos",
+        "bioma": "Amazônia",
+        "nome_bacia": "Rio Negro / Médio Solimões",
+        "municipio_bacia": "Barcelos/AM · Bacia do Rio Negro",
+        "grau_risco": "CRÍTICO",
+        "fase_licenca": "Licença Prévia em Análise (EIA/RIMA)",
+        "orgao_ambiental": "IBAMA / Dilic",
+        "potencia_mw": null,
+        "vazao_m3s": 0.42,
+        "dist_ti_km": 0.0,
+        "num_processo": "02001.008412/2024-19",
+        "pct_veg_nativa": 88.4,
+        "pct_agropecuaria": 6.2,
+        "desmat_2019_ha": 4210,
+        "desmat_2020_ha": 5180,
+        "desmat_2021_ha": 6890,
+        "desmat_2022_ha": 7420,
+        "desmat_2023_ha": 6150,
+        "desmat_2024_ha": 8340,
+        "desmatamento_ha": 38190,
+        "demanda_hidrica_hm3": 13.2,
+        "pct_area_convertida": 11.6,
+        "pct_comprometimento_q95": 18.0,
+        "data_vencimento": "2026-10-01T00:00:00Z",
+        "data_protocolo_renovacao": null,
+        "situacao_administrativa": "ATIVA"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-62.9285, -0.9735]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "codigo_ativo": "MON-MAT-002",
+        "nome_ativo": "Polo Agroindustrial e Irrigação Rio Grande Oeste",
+        "tipologia": "Agronegócio Irrigado (Pivôs Centrais)",
+        "uf": "BA",
+        "cd_mun": "2928901",
+        "nm_mun": "São Desidério",
+        "bioma": "Cerrado",
+        "nome_bacia": "Rio Grande / Aquífero Urucuia",
+        "municipio_bacia": "São Desidério/BA · Bacia do Rio Grande",
+        "grau_risco": "ALTO",
+        "fase_licenca": "Licença de Operação (LO)",
+        "orgao_ambiental": "INEMA-BA / ANA",
+        "potencia_mw": null,
+        "vazao_m3s": 6.85,
+        "dist_ti_km": 48.5,
+        "num_processo": "2022.001.049312/INEMA",
+        "pct_veg_nativa": 38.2,
+        "pct_agropecuaria": 58.6,
+        "desmat_2019_ha": 14800,
+        "desmat_2020_ha": 16200,
+        "desmat_2021_ha": 19450,
+        "desmat_2022_ha": 24100,
+        "desmat_2023_ha": 27800,
+        "desmat_2024_ha": 22900,
+        "desmatamento_ha": 125250,
+        "demanda_hidrica_hm3": 216.0,
+        "pct_area_convertida": 61.8,
+        "pct_comprometimento_q95": 84.5,
+        "data_vencimento": "2026-09-15T00:00:00Z",
+        "data_protocolo_renovacao": "2026-04-10T00:00:00Z",
+        "situacao_administrativa": "ATIVA"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-45.9752, -12.3584]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "codigo_ativo": "MON-ENE-003",
+        "nome_ativo": "Complexo Híbrido Eólico-Solar Sertão Setentrional",
+        "tipologia": "Geração Renovável e Transmissão 500 kV",
+        "uf": "RN",
+        "cd_mun": "2407104",
+        "nm_mun": "Macau",
+        "bioma": "Caatinga / Zona Costeira",
+        "nome_bacia": "Piranhas-Açu",
+        "municipio_bacia": "Macau/RN · Bacia Piranhas-Açu",
+        "grau_risco": "MODERADO",
+        "fase_licenca": "Licença de Instalação (LI)",
+        "orgao_ambiental": "IDEMA-RN",
+        "potencia_mw": 412.5,
+        "vazao_m3s": null,
+        "dist_ti_km": 92.4,
+        "num_processo": "2024-118092/TEC/LI",
+        "pct_veg_nativa": 54.0,
+        "pct_agropecuaria": 31.5,
+        "desmat_2019_ha": 820,
+        "desmat_2020_ha": 740,
+        "desmat_2021_ha": 1120,
+        "desmat_2022_ha": 980,
+        "desmat_2023_ha": 690,
+        "desmat_2024_ha": 610,
+        "desmatamento_ha": 4960,
+        "demanda_hidrica_hm3": 4.8,
+        "pct_area_convertida": 46.0,
+        "pct_comprometimento_q95": 52.0,
+        "data_vencimento": "2027-08-20T00:00:00Z",
+        "data_protocolo_renovacao": null,
+        "situacao_administrativa": "ATIVA"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-36.6347, -5.1152]
+      }
+    }
+  ]
+}

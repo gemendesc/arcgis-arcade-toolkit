@@ -1,0 +1,67 @@
+/**
+ * Título: Central de Ações e Deep Links Parametrizados (Experience Builder & Bases Oficiais)
+ * Perfil Arcade: Popup Element (Text / HTML)
+ * Contexto: Integração entre Web Maps, ArcGIS Experience Builder e Portais Governamentais
+ *
+ * Objetivo:
+ * Gera botões de ação rápida no Pop-up com URLs construídas dinamicamente a partir das
+ * coordenadas geográficas da feição e chaves primárias (Código IBGE / Código CAR),
+ * permitindo abrir inspeção de satélite de alta resolução ou filtrar painéis irmãos.
+ */
+
+function MercatorParaWGS84(x, y) {
+    var lon = (x / 20037508.34) * 180;
+    var lat = (Atan(Exp((y / 20037508.34) * PI)) * 360 / PI) - 90;
+    return { lon: lon, lat: lat };
+}
+
+var centroide = Centroid(Geometry($feature));
+if (IsEmpty(centroide)) {
+    return { type: "text", text: "Coordenadas indisponíveis." };
+}
+
+var sr = centroide.spatialReference.wkid;
+var geo = IIf(
+    sr == 3857 || sr == 102100,
+    MercatorParaWGS84(centroide.x, centroide.y),
+    { lon: centroide.x, lat: centroide.y }
+);
+
+var latStr = Text(geo.lat, "0.000000");
+var lonStr = Text(geo.lon, "0.000000");
+var cdMun = DefaultValue($feature.cd_mun, "");
+var idAtivo = UrlEncode(DefaultValue($feature.codigo_ativo, ""));
+
+// 1. Deep links parametrizados
+var urlExB = "https://experience.arcgis.com/experience/painel-integrado/#data_s=id%3AdataSource_1-ativos%3Acodigo_ativo%3D'" + idAtivo + "'";
+var urlGoogleEarth = "https://earth.google.com/web/@" + latStr + "," + lonStr + ",450a,3500d,35y,0h,0t,0r";
+var urlIBGE = IIf(!IsEmpty(cdMun), "https://cidades.ibge.gov.br/brasil/panorama?cod=" + UrlEncode(cdMun), "");
+
+var estiloBotaoPrimario = "display:block;padding:7px 10px;margin-bottom:6px;background:#24506b;color:#ffffff;text-decoration:none;font-size:11.5px;font-weight:700;border-radius:2px;text-align:center;";
+var estiloBotaoSecundario = "display:block;padding:6px 10px;margin-bottom:6px;background:#eceeeb;color:#1e2328;border:1px solid #b2b9b4;text-decoration:none;font-size:11.5px;font-weight:600;border-radius:2px;text-align:center;";
+
+var botaoIBGE = IIf(
+    !IsEmpty(urlIBGE),
+    "<a href='" + urlIBGE + "' target='_blank' rel='noopener noreferrer' style='" + estiloBotaoSecundario + "'>Consultar Perfil Municipal IBGE (" + cdMun + ") ↗</a>",
+    ""
+);
+
+var html = (
+    "<div style='font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#f6f7f5;border:1px solid #cfd4d0;padding:10px;'>" +
+        "<div style='font-size:10px;font-family:monospace;color:#646c72;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;'>" +
+            "Centroide WGS84: " + latStr + ", " + lonStr +
+        "</div>" +
+        "<a href='" + urlExB + "' target='_blank' rel='noopener noreferrer' style='" + estiloBotaoPrimario + "'>" +
+            "Filtrar Dossiê no Experience Builder ↗" +
+        "</a>" +
+        "<a href='" + urlGoogleEarth + "' target='_blank' rel='noopener noreferrer' style='" + estiloBotaoSecundario + "'>" +
+            "Inspecionar Cena 3D no Google Earth Web ↗" +
+        "</a>" +
+        botaoIBGE +
+    "</div>"
+);
+
+return {
+    type: "text",
+    text: html
+};

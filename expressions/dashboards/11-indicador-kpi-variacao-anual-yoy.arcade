@@ -1,0 +1,82 @@
+/**
+ * Título: Indicador Executivo (KPI) com Variação Homóloga (YoY) e Semáforo de Meta
+ * Perfil Arcade: ArcGIS Dashboards — Indicator (Advanced Formatting)
+ * Contexto: Monitoramento de Supressão Vegetal, Emissões GEE ou Captação Hídrica
+ *
+ * Objetivo:
+ * Calcula automaticamente a variação percentual entre o período corrente ($datapoint)
+ * e o período homólogo de referência ($reference), alterando tipografia, setas de
+ * tendência (▲ / ▼) e destaque visual conforme a polaridade do indicador ambiental
+ * (onde aumento de área suprimida é negativo e redução é positivo).
+ */
+
+var valorAtual = DefaultValue($datapoint.sum_area_suprimida_ha, 0);
+var valorAnterior = DefaultValue($reference.sum_area_suprimida_ha, 0);
+var metaAnualMax = 15000; // Meta institucional teto (ha/ano)
+
+// 1. Cálculo seguro da variação percentual interanual (YoY)
+var variacaoPct = IIf(
+    valorAnterior > 0,
+    ((valorAtual - valorAnterior) / valorAnterior) * 100,
+    0
+);
+
+var diferencaAbsoluta = valorAtual - valorAnterior;
+var seta = When(
+    variacaoPct > 1.5, "▲ +",
+    variacaoPct < -1.5, "▼ ",
+    "● "
+);
+
+// 2. Definição semafórica (em desmatamento/alertas, queda é verde e alta é terracota)
+var isCritico = (valorAtual > metaAnualMax) || (variacaoPct > 5);
+var isPositivo = (variacaoPct <= -5) && (valorAtual <= metaAnualMax);
+
+var corValorPrincipal = When(
+    isCritico, "#b83b1d",
+    isPositivo, "#2d6a4f",
+    "#1e2328"
+);
+
+var corFundoCard = When(
+    isCritico, "#fdf4f1",
+    isPositivo, "#f2f8f5",
+    "#f6f7f5"
+);
+
+var corSubtitulo = When(
+    variacaoPct > 1.5, "#b83b1d",
+    variacaoPct < -1.5, "#2d6a4f",
+    "#646c72"
+);
+
+// 3. Textos formatados para o layout do widget Indicator
+var txtPrincipal = Text(valorAtual, "#,###") + " ha";
+var txtComparativo = IIf(
+    valorAnterior > 0,
+    seta + Text( variacaoPct, "0.0" ) + "% vs. ciclo anterior (" +
+    IIf(diferencaAbsoluta >= 0, "+", "") + Text(diferencaAbsoluta, "#,###") + " ha)",
+    "Sem base homóloga no ciclo anterior"
+);
+
+var statusMeta = IIf(
+    valorAtual > metaAnualMax,
+    "LIMITE EXCEDIDO (+" + Text(valorAtual - metaAnualMax, "#,###") + " ha acima do teto)",
+    "DENTRO DO LIMITE ANUAL (" + Text((valorAtual / metaAnualMax) * 100, "0.0") + "% do teto)"
+);
+
+return {
+    topText: statusMeta,
+    topTextColor: IIf(valorAtual > metaAnualMax, "#b83b1d", "#24506b"),
+    topTextOutlineColor: "",
+    topTextMaxSize: "small",
+    middleText: txtPrincipal,
+    middleTextColor: corValorPrincipal,
+    middleTextOutlineColor: "",
+    middleTextMaxSize: "large",
+    bottomText: txtComparativo,
+    bottomTextColor: corSubtitulo,
+    bottomTextOutlineColor: "",
+    bottomTextMaxSize: "small",
+    backgroundColor: corFundoCard
+};

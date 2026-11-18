@@ -1,0 +1,104 @@
+/**
+ * Título: Sobreposição Geodésica com Terras Indígenas e Unidades de Conservação
+ * Perfil Arcade: Popup | Attribute Rule (Calculation) | Field Calculation
+ * Contexto: Licenciamento Ambiental e Monitoramento Territorial (FUNAI / ICMBio)
+ *
+ * Objetivo:
+ * Avalia em tempo de execução se a geometria do empreendimento ($feature) intercepta
+ * polígonos oficiais de Terras Indígenas (TIs) ou Unidades de Conservação (UCs),
+ * calculando a área exata sobreposta (ha) e o percentual sobre o ativo analisado.
+ *
+ * Boas práticas aplicadas:
+ * - Uso de AreaGeodetic() em vez de Area() planar para evitar distorções de projeção Web Mercator.
+ * - Pré-filtragem SQL via Filter() antes da operação topológica Intersects().
+ */
+
+// 1. Validação defensiva da geometria de entrada
+var geomAtivo = Geometry($feature);
+if (IsEmpty(geomAtivo)) {
+    return "Geometria indisponível para análise espacial.";
+}
+
+var areaTotalHa = AreaGeodetic(geomAtivo, "hectares");
+if (areaTotalHa <= 0) {
+    return "Área do ativo inválida (<= 0 ha).";
+}
+
+// 2. Conexão aos Feature Layers oficiais no Portal / ArcGIS Online
+// Substitua os Item IDs pelos serviços homologados da organização
+var fsUCs = Filter(
+    FeatureSetByPortalItem(
+        Portal("https://www.arcgis.com"),
+        "a1b2c3d4e5f6478990123456789abcde",
+        0,
+        ["nome_uc", "grupo", "esfera"],
+        true
+    ),
+    "situacao = 'Ativa'"
+);
+
+var fsTIs = Filter(
+    FeatureSetByPortalItem(
+        Portal("https://www.arcgis.com"),
+        "f6e5d4c3b2a1478990123456789fedcb",
+        0,
+        ["terrai_nom", "fase_ti"],
+        true
+    ),
+    "fase_ti IN ('Homologada', 'Declarada', 'Regularizada')"
+);
+
+// 3. Consulta espacial (Server-side bounding box + interseção exata)
+var ucsInterceptadas = Intersects(fsUCs, geomAtivo);
+var tisInterceptadas = Intersects(fsTIs, geomAtivo);
+
+var ocorrencias = [];
+var areaRestritaAcumuladaHa = 0;
+
+// 4. Cálculo geodésico dos recortes sobrepostos em Unidades de Conservação
+for (var uc in ucsInterceptadas) {
+    var recorteUC = Intersection(geomAtivo, Geometry(uc));
+    if (!IsEmpty(recorteUC)) {
+        var haUC = AreaGeodetic(recorteUC, "hectares");
+        if (haUC > 0.01) {
+            areaRestritaAcumuladaHa += haUC;
+            var pctUC = (haUC / areaTotalHa) * 100;
+            Push(
+                ocorrencias,
+                "• [UC - " + DefaultValue(uc.grupo, "SNUC") + "] " + uc.nome_uc +
+                ": " + Text(haUC, "#,###.00") + " ha (" + Text(pctUC, "0.0") + "%)"
+            );
+        }
+    }
+}
+
+// 5. Cálculo geodésico dos recortes sobrepostos em Terras Indígenas
+for (var ti in tisInterceptadas) {
+    var recorteTI = Intersection(geomAtivo, Geometry(ti));
+    if (!IsEmpty(recorteTI)) {
+        var haTI = AreaGeodetic(recorteTI, "hectares");
+        if (haTI > 0.01) {
+            areaRestritaAcumuladaHa += haTI;
+            var pctTI = (haTI / areaTotalHa) * 100;
+            Push(
+                ocorrencias,
+                "• [TI - " + ti.fase_ti + "] " + ti.terrai_nom +
+                ": " + Text(haTI, "#,###.00") + " ha (" + Text(pctTI, "0.0") + "%)"
+            );
+        }
+    }
+}
+
+// 6. Síntese executiva para Pop-up ou atributo virtual
+if (Count(ocorrencias) == 0) {
+    return "CONFORME — Nenhuma sobreposição direta com TIs ou UCs (" +
+           Text(areaTotalHa, "#,###.0") + " ha avaliados).";
+}
+
+var pctTotal = Min((areaRestritaAcumuladaHa / areaTotalHa) * 100, 100);
+var cabecalho = "ALERTA CRÍTICO — " + Count(ocorrencias) +
+                " sobreposição(ões) detectada(s) | Soma bruta: " +
+                Text(areaRestritaAcumuladaHa, "#,###.00") + " ha (" +
+                Text(pctTotal, "0.0") + "% do ativo)";
+
+return cabecalho + TextFormatting.NewLine + Concatenate(ocorrencias, TextFormatting.NewLine);

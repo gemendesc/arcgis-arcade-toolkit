@@ -1,0 +1,66 @@
+/**
+ * Título: Distância Geodésica a Recursos Hídricos e Checagem de Faixa de APP
+ * Perfil Arcade: Popup | Field Maps Calculated Expression
+ * Contexto: Código Florestal (Lei Federal nº 12.651/2012, Art. 4º) e Outorgas ANA
+ *
+ * Objetivo:
+ * Localiza o curso d'água mais próximo em um raio de busca geodésico de 600 m,
+ * determina a faixa marginal mínima de Área de Preservação Permanente (APP) segundo
+ * a largura da calha regular (largura_m) e avalia se a intervenção respeita o recuo legal.
+ */
+
+var geomPonto = Geometry($feature);
+if (IsEmpty(geomPonto)) {
+    return "Sem geometria válida.";
+}
+
+// 1. Buffer geodésico de busca (evita varrer toda a base hidrográfica estadual)
+var raioBusca = BufferGeodetic(geomPonto, 600, "meters");
+var fsHidrografia = FeatureSetByName(
+    $map,
+    "Hidrografia_Unifilar_ANA",
+    ["nome_rio", "largura_m", "regime"],
+    true
+);
+
+var trechosProximos = Intersects(fsHidrografia, raioBusca);
+if (Count(trechosProximos) == 0) {
+    return "REGULAR — Nenhum curso d'água mapeado em raio de 600 m.";
+}
+
+// 2. Identificação do trecho hidrográfico efetivamente mais próximo
+var menorDistanciaM = 999999;
+var rioMaisProximo = null;
+
+for (var rio in trechosProximos) {
+    // DistanceGeodetic garante precisão métrica independente do fuso/latitudes
+    var infoDist = DistanceGeodetic(geomPonto, Centroid(Geometry(rio)), "meters");
+    var distM = IIf(!IsEmpty(infoDist), infoDist.distance, Distance(geomPonto, rio, "meters"));
+
+    if (distM < menorDistanciaM) {
+        menorDistanciaM = distM;
+        rioMaisProximo = rio;
+    }
+}
+
+// 3. Faixa mínima de APP conforme Art. 4º, I da Lei nº 12.651/2012
+var larguraRio = DefaultValue(rioMaisProximo.largura_m, 5);
+var faixaAppLegalM = When(
+    larguraRio < 10, 30,
+    larguraRio <= 50, 50,
+    larguraRio <= 200, 100,
+    larguraRio <= 600, 200,
+    500
+);
+
+var nomeRio = DefaultValue(rioMaisProximo.nome_rio, "Curso d'água sem denominação");
+var saldoM = menorDistanciaM - faixaAppLegalM;
+
+if (saldoM < 0) {
+    return "CONFLITO DE APP — Intervenção a " + Text(menorDistanciaM, "0.0") + " m de " +
+           nomeRio + " (largura: " + Text(larguraRio, "0") + " m | APP exigida: " +
+           faixaAppLegalM + " m | déficit: " + Text(Abs(saldoM), "0.0") + " m).";
+}
+
+return "CONFORME — A " + Text(menorDistanciaM, "0.0") + " m de " + nomeRio +
+       " (APP mínima: " + faixaAppLegalM + " m | folga: +" + Text(saldoM, "0.0") + " m).";

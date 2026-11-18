@@ -1,0 +1,51 @@
+/**
+ * Título: Classificação Multicritério Bivariada (3×3) — Conversão Vegetal × Estresse Hídrico
+ * Perfil Arcade: Visualization (Symbology — Unique Values)
+ * Contexto: Diagnóstico Territorial Integrado (MapBiomas / PRODES × SNIRH / ANA)
+ *
+ * Objetivo:
+ * Combina duas variáveis contínuas em tempo de execução — taxa de conversão do uso do solo (%)
+ * e razão entre demanda hídrica consuntiva e disponibilidade Q95 (%) — retornando uma das 9
+ * classes de uma matriz coroplética bivariada 3×3 sem necessidade de criar colunas no banco.
+ */
+
+var taxaConversaoPct = $feature.pct_area_convertida;
+var comprometimentoQ95Pct = $feature.pct_comprometimento_q95;
+
+// 1. Tratamento explícito para feições sem dados hidrológicos ou de cobertura
+if (IsEmpty(taxaConversaoPct) || IsEmpty(comprometimentoQ95Pct)) {
+    return "00 - Sem dados suficientes";
+}
+
+// 2. Discretização do Eixo X: Conversão Antrópica Acumulada (%)
+// Limiares calibrados para bacias hidrográficas de fronteira agrícola
+var classeConversao = When(
+    taxaConversaoPct >= 50, "3", // Alta conversão (>= 50% da bacia)
+    taxaConversaoPct >= 20, "2", // Moderada conversão (20% a 50%)
+    "1"                          // Baixa conversão (< 20%)
+);
+
+// 3. Discretização do Eixo Y: Comprometimento Quantitativo da Vazão Outorgável (ANA)
+// Faixas alinhadas aos indicadores de criticidade hídrica (baixa <30%, atenção 30-70%, crítica >=70%)
+var classeHidrica = When(
+    comprometimentoQ95Pct >= 70, "C", // Crítico (>= 70% da Q95 comprometida)
+    comprometimentoQ95Pct >= 30, "B", // Atenção / Alerta (30% a 70%)
+    "A"                               // Confortável (< 30%)
+);
+
+var codigoBivariado = classeHidrica + classeConversao;
+
+// 4. Mapeamento legível para a legenda do Web Map / Experience Builder
+var descricoes = {
+    "C3": "C3 — Crítico Duplo (Alta Conversão + Alto Estresse Hídrico)",
+    "C2": "C2 — Estresse Hídrico Crítico + Conversão Moderada",
+    "C1": "C1 — Estresse Hídrico Crítico + Vegetação Preservada",
+    "B3": "B3 — Alta Conversão + Pressão Hídrica Moderada",
+    "B2": "B2 — Transição Intermediária (Moderada / Moderada)",
+    "B1": "B1 — Baixa Conversão + Pressão Hídrica Moderada",
+    "A3": "A3 — Fronteira Seca (Alta Conversão + Baixa Demanda Azul)",
+    "A2": "A2 — Conversão Moderada + Conforto Hídrico",
+    "A1": "A1 — Conservação Integral (Baixa Conversão + Conforto Hídrico)"
+};
+
+return DefaultValue(descricoes[codigoBivariado], "00 - Sem dados suficientes");

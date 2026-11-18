@@ -1,0 +1,100 @@
+/**
+ * Título: Ficha Técnica Socioambiental Responsiva com Ocultação de Nulos
+ * Perfil Arcade: Popup Element (Text / HTML)
+ * Contexto: Plataformas Públicas de Monitoramento (Energia, Mineração e Infraestrutura)
+ *
+ * Objetivo:
+ * Substitui a tabela padrão do ArcGIS Map Viewer por um card editorial limpo,
+ * com cabeçalho codificado por nível de criticidade socioambiental e omissão
+ * automática de campos vazios/nulos (evitando linhas em branco no pop-up).
+ *
+ * Nota técnica Esri:
+ * Utiliza exclusivamente tags HTML e propriedades CSS inline homologadas pelo
+ * sanitizador HTML do ArcGIS Online / Map Viewer / Experience Builder.
+ */
+
+// 1. Paleta condicional segundo criticidade socioambiental do empreendimento
+var nivel = Upper(DefaultValue($feature.grau_risco, "MODERADO"));
+
+var corDestaque = When(
+    nivel == "CRITICO" || nivel == "CRÍTICO", "#b83b1d",
+    nivel == "ALTO", "#d9532f",
+    nivel == "MODERADO", "#24506b",
+    "#2d6a4f"
+);
+
+var corFundoBadge = When(
+    nivel == "CRITICO" || nivel == "CRÍTICO", "#fbeae5",
+    nivel == "ALTO", "#fdf0ec",
+    nivel == "MODERADO", "#dce6ec",
+    "#e6f2ec"
+);
+
+// 2. Função auxiliar: renderiza linha apenas se o valor existir e não estiver vazio
+function LinhaAtributo(rotulo, valorFormatado) {
+    if (IsEmpty(valorFormatado) || Trim(Text(valorFormatado)) == "") {
+        return "";
+    }
+    return (
+        "<tr>" +
+            "<td style='padding:6px 8px;border-bottom:1px solid #e3e6e2;color:#646c72;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;width:42%;'>" +
+                rotulo +
+            "</td>" +
+            "<td style='padding:6px 8px;border-bottom:1px solid #e3e6e2;color:#1e2328;font-size:12.5px;font-weight:600;text-align:right;'>" +
+                valorFormatado +
+            "</td>" +
+        "</tr>"
+    );
+}
+
+// 3. Formatação condicional dos atributos (campos nulos retornam string vazia)
+var potMW = IIf(
+    !IsEmpty($feature.potencia_mw) && $feature.potencia_mw > 0,
+    Text($feature.potencia_mw, "#,###.0") + " MW",
+    ""
+);
+
+var vazaoOutorga = IIf(
+    !IsEmpty($feature.vazao_m3s) && $feature.vazao_m3s > 0,
+    Text($feature.vazao_m3s, "#,###.00") + " m³/s",
+    ""
+);
+
+var distTerraIndigena = IIf(
+    !IsEmpty($feature.dist_ti_km),
+    IIf($feature.dist_ti_km == 0, "SOBREPOSIÇÃO DIRETA (0,0 km)", Text($feature.dist_ti_km, "#,###.1") + " km"),
+    ""
+);
+
+// 4. Montagem do Card HTML
+var html = (
+    "<div style='font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;border:1px solid #cfd4d0;border-top:4px solid " + corDestaque + ";background:#f6f7f5;border-radius:2px;overflow:hidden;'>" +
+        "<div style='padding:10px 12px;background:#eceeeb;border-bottom:1px solid #cfd4d0;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;'>" +
+            "<div>" +
+                "<div style='font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#646c72;font-weight:700;'>" +
+                    DefaultValue($feature.tipologia, "Empreendimento Monitorado") + " · " + DefaultValue($feature.uf, "BR") +
+                "</div>" +
+                "<div style='font-size:15px;font-weight:800;color:#1e2328;margin-top:2px;line-height:1.2;'>" +
+                    DefaultValue($feature.nome_ativo, "Sem denominação") +
+                "</div>" +
+            "</div>" +
+            "<span style='background:" + corFundoBadge + ";color:" + corDestaque + ";border:1px solid " + corDestaque + ";padding:2px 7px;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;white-space:nowrap;'>" +
+                nivel +
+            "</span>" +
+        "</div>" +
+        "<table style='width:100%;border-collapse:collapse;'>" +
+            LinhaAtributo("Município / Bacia", DefaultValue($feature.municipio_bacia, "")) +
+            LinhaAtributo("Fase de Licenciamento", DefaultValue($feature.fase_licenca, "")) +
+            LinhaAtributo("Órgão Licenciador", DefaultValue($feature.orgao_ambiental, "")) +
+            LinhaAtributo("Potência Instalada", potMW) +
+            LinhaAtributo("Outorga Hídrica (ANA)", vazaoOutorga) +
+            LinhaAtributo("Distância à TI mais próxima", distTerraIndigena) +
+            LinhaAtributo("Processo Administrativo", DefaultValue($feature.num_processo, "")) +
+        "</table>" +
+    "</div>"
+);
+
+return {
+    type: "text",
+    text: html
+};

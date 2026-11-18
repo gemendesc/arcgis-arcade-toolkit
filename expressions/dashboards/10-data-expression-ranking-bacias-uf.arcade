@@ -1,0 +1,112 @@
+/**
+ * Título: Data Expression Multi-Camadas — Consolidação de Pressão Hídrica e Desmatamento por Bacia
+ * Perfil Arcade: ArcGIS Dashboards — Data Expression
+ * Contexto: Salas de Situação Executivas (Cruzamento de camadas sem relacionamento prévio no banco)
+ *
+ * Objetivo:
+ * Consolida duas Feature Layers independentes do ArcGIS Online — (1) Alertas de Supressão
+ * Vegetal e (2) Outorgas de Captação Hídrica — agregando ambas por código de bacia hidrográfica
+ * via GroupBy() no servidor e realizando Hash Join O(N + M) em memória para alimentar
+ * gráficos combinados (Serial Chart) e tabelas ranqueadas no ArcGIS Dashboards.
+ */
+
+var portalUrl = Portal("https://www.arcgis.com");
+
+// 1. Agregação server-side (SQL GROUP BY) da camada de Alertas de Desmatamento
+var fsAlertas = Filter(
+    FeatureSetByPortalItem(
+        portalUrl,
+        "11112222333344445555666677778888",
+        0,
+        ["cod_bacia", "nome_bacia", "uf_predominante", "area_ha", "ano_deteccao"],
+        false
+    ),
+    "ano_deteccao >= 2022"
+);
+
+var alertasPorBacia = GroupBy(
+    fsAlertas,
+    ["cod_bacia", "nome_bacia", "uf_predominante"],
+    [
+        { name: "total_desmat_ha", expression: "area_ha", statistic: "SUM" },
+        { name: "qtd_poligonos", expression: "1", statistic: "COUNT" }
+    ]
+);
+
+// 2. Agregação server-side (SQL GROUP BY) da camada independente de Outorgas Hídricas (ANA)
+var fsOutorgas = Filter(
+    FeatureSetByPortalItem(
+        portalUrl,
+        "99998888777766665555444433332222",
+        0,
+        ["cod_bacia", "vazao_anual_hm3", "finalidade"],
+        false
+    ),
+    "finalidade IN ('Irrigacao', 'Irrigação', 'Mineração', 'Termoeletrica')"
+);
+
+var outorgasPorBacia = GroupBy(
+    fsOutorgas,
+    ["cod_bacia"],
+    [
+        { name: "demanda_hm3_ano", expression: "vazao_anual_hm3", statistic: "SUM" },
+        { name: "num_outorgas", expression: "1", statistic: "COUNT" }
+    ]
+);
+
+// 3. Indexação em dicionário (Hash Join O(N + M) — evita loop aninhado O(N * M))
+var indiceOutorgas = {};
+for (var o in outorgasPorBacia) {
+    indiceOutorgas[Text(o.cod_bacia)] = {
+        hm3: DefaultValue(o.demanda_hm3_ano, 0),
+        qtd: DefaultValue(o.num_outorgas, 0)
+    };
+}
+
+// 4. Construção do FeatureSet virtual combinado em memória
+var feicoesCombinadas = [];
+
+for (var a in alertasPorBacia) {
+    var chave = Text(a.cod_bacia);
+    var dadosAgua = IIf(
+        HasKey(indiceOutorgas, chave),
+        indiceOutorgas[chave],
+        { hm3: 0, qtd: 0 }
+    );
+
+    var haDesmat = Round(DefaultValue(a.total_desmat_ha, 0), 1);
+    var hm3Agua = Round(dadosAgua.hm3, 2);
+
+    // Índice sintético normalizado de pressão territorial combinada (0-100)
+    var scorePressao = Round(Min((haDesmat / 500) * 0.55 + (hm3Agua / 25) * 0.45, 100), 1);
+
+    Push(feicoesCombinadas, {
+        attributes: {
+            cod_bacia: chave,
+            nome_bacia: a.nome_bacia,
+            uf: a.uf_predominante,
+            desmatamento_ha: haDesmat,
+            qtd_alertas: a.qtd_poligonos,
+            demanda_hidrica_hm3: hm3Agua,
+            num_outorgas: dadosAgua.qtd,
+            indice_pressao: scorePressao
+        }
+    });
+}
+
+var schemaVirtual = {
+    geometryType: "",
+    fields: [
+        { name: "cod_bacia", type: "esriFieldTypeString", alias: "Código Bacia" },
+        { name: "nome_bacia", type: "esriFieldTypeString", alias: "Sub-bacia Hidrográfica" },
+        { name: "uf", type: "esriFieldTypeString", alias: "UF" },
+        { name: "desmatamento_ha", type: "esriFieldTypeDouble", alias: "Supressão Acumulada (ha)" },
+        { name: "qtd_alertas", type: "esriFieldTypeInteger", alias: "Nº de Polígonos" },
+        { name: "demanda_hidrica_hm3", type: "esriFieldTypeDouble", alias: "Demanda Outorgada (hm³/ano)" },
+        { name: "num_outorgas", type: "esriFieldTypeInteger", alias: "Outorgas Ativas" },
+        { name: "indice_pressao", type: "esriFieldTypeDouble", alias: "Índice de Pressão Combinada" }
+    ],
+    features: feicoesCombinadas
+};
+
+return OrderBy(FeatureSet(schemaVirtual), "indice_pressao DESC");

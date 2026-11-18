@@ -1,0 +1,58 @@
+/**
+ * Título: Semáforo Temporal para Licenças Ambientais, Outorgas e Condicionantes
+ * Perfil Arcade: Visualization (Symbology) | Popup
+ * Contexto: Gestão Ambiental de Infraestrutura Linear, Energia e Mineração (CONAMA nº 237/1997)
+ *
+ * Objetivo:
+ * Avalia diariamente a validade jurídica de licenças (LP/LI/LO) e outorgas hídricas
+ * comparando a data de vencimento com Now(), incorporando a regra do Art. 18, § 4º da
+ * Resolução CONAMA 237/1997 (prorrogação automática mediante protocolo com >= 120 dias).
+ */
+
+var dtVencimento = $feature.data_vencimento;
+var dtProtocoloRenov = $feature.data_protocolo_renovacao;
+var statusManual = Upper(DefaultValue($feature.situacao_administrativa, "ATIVA"));
+
+// 1. Casos administrativos soberanos (Suspensa / Cancelada / Arquivada)
+if (statusManual == "SUSPENSA" || statusManual == "EMBARGADA") {
+    return "01 - Suspensa / Embargada";
+}
+
+if (IsEmpty(dtVencimento)) {
+    return "06 - Sem data de vencimento cadastrada";
+}
+
+// 2. Cálculo de prazo restante em dias corridos a partir do instante atual
+var diasParaVencer = Floor(DateDiff(dtVencimento, Now(), "days"));
+
+// 3. Verificação da tempestividade do pedido de renovação (Regra dos 120 dias - CONAMA 237/97)
+var protocoloTempestivo = false;
+if (!IsEmpty(dtProtocoloRenov)) {
+    var antecedenciaProtocolo = Floor(DateDiff(dtVencimento, dtProtocoloRenov, "days"));
+    protocoloTempestivo = (antecedenciaProtocolo >= 120);
+}
+
+// 4. Árvore decisória para simbologia semafórica no mapa operacional
+if (diasParaVencer < 0) {
+    if (protocoloTempestivo) {
+        return "03 - Prorrogada Automaticamente (CONAMA 237/97 §4º)";
+    }
+    return "01 - Vencida sem Renovação Tempestiva";
+}
+
+if (diasParaVencer <= 30) {
+    return "02 - Crítico: Vence em até 30 dias";
+}
+
+if (diasParaVencer < 120) {
+    if (!IsEmpty(dtProtocoloRenov)) {
+        return "04 - Em Renovação (< 120 dias do vencimento)";
+    }
+    return "02 - Urgente: Prazo Limite CONAMA (< 120 dias s/ protocolo)";
+}
+
+if (diasParaVencer <= 180) {
+    return "04 - Atenção: Planejar Renovação (120 a 180 dias)";
+}
+
+return "05 - Vigente Regular (> 180 dias)";

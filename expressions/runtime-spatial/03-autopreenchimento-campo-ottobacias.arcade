@@ -1,0 +1,72 @@
+/**
+ * Título: Autopreenchimento Territorial em Campo (Município, Ottobacia e GMS)
+ * Perfil Arcade: Field Maps (Form Calculation) | Attribute Rules
+ * Contexto: Vistorias Ambientais, Monitoramento Hidrológico e Licenciamento em Campo
+ *
+ * Objetivo:
+ * No ato da coleta ou edição do ponto no ArcGIS Field Maps, extrai automaticamente
+ * Município/UF (IBGE), Código de Ottobacia Nível 5 (ANA) e formata as coordenadas
+ * geográficas em Graus, Minutos e Segundos (GMS) para laudos técnicos.
+ */
+
+// Função auxiliar: converte grau decimal para notação técnica GMS (ex: 12°09'14.2"S)
+function DecimalParaGMS(valorDecimal, isLongitude) {
+    var hemisferio = IIf(
+        isLongitude,
+        IIf(valorDecimal < 0, "W", "E"),
+        IIf(valorDecimal < 0, "S", "N")
+    );
+    var absVal = Abs(valorDecimal);
+    var graus = Floor(absVal);
+    var minFloat = (absVal - graus) * 60;
+    var minutos = Floor(minFloat);
+    var segundos = (minFloat - minutos) * 60;
+
+    return Text(graus, "00") + "°" +
+           Text(minutos, "00") + "'" +
+           Text(segundos, "00.0") + "\"" + hemisferio;
+}
+
+// Auxiliar para conversão Web Mercator (EPSG:3857) -> Geográfico (SIRGAS 2000 / WGS84)
+function MercatorParaLonLat(x, y) {
+    var lon = (x / 20037508.34) * 180;
+    var lat = (Atan(Exp((y / 20037508.34) * PI)) * 360 / PI) - 90;
+    return { lon: lon, lat: lat };
+}
+
+var pt = Centroid(Geometry($feature));
+if (IsEmpty(pt)) {
+    return null;
+}
+
+// 1. Extração das coordenadas geográficas independentemente do Spatial Reference do mapa
+var wkid = pt.spatialReference.wkid;
+var coords = IIf(
+    wkid == 3857 || wkid == 102100,
+    MercatorParaLonLat(pt.x, pt.y),
+    { lon: pt.x, lat: pt.y }
+);
+
+var coordGMS = DecimalParaGMS(coords.lat, false) + "  " + DecimalParaGMS(coords.lon, true);
+
+// 2. Cruzamento com malha municipal IBGE e Ottobacias ANA disponíveis no Web Map
+var fsMunicipios = FeatureSetByName($map, "Municipios_IBGE", ["nm_mun", "sigla_uf", "cd_mun"], false);
+var fsOttobacias = FeatureSetByName($map, "Ottobacias_ANA_N5", ["cobacia", "nm_bacia"], false);
+
+var mun = First(Intersects(fsMunicipios, pt));
+var otto = First(Intersects(fsOttobacias, pt));
+
+var rotuloMun = IIf(
+    !IsEmpty(mun),
+    mun.nm_mun + "/" + mun.sigla_uf + " (IBGE " + mun.cd_mun + ")",
+    "Fora da malha municipal / Offline"
+);
+
+var rotuloBacia = IIf(
+    !IsEmpty(otto),
+    otto.nm_bacia + " [Otto " + otto.cobacia + "]",
+    "Bacia não identificada"
+);
+
+// Retorno consolidado para campo síntese de cabeçalho de vistoria (ou JSON estruturado)
+return rotuloMun + " | " + rotuloBacia + " | Coord: " + coordGMS;

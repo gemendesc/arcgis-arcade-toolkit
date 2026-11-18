@@ -1,0 +1,39 @@
+/**
+ * Título: Rotulagem Multilinha Adaptativa por Escala Cartográfica ($view.scale)
+ * Perfil Arcade: Labeling
+ * Contexto: Cartografia Temática WebGIS (Unidades de Conservação, Blocos ANP e Bacias)
+ *
+ * Objetivo:
+ * Evita poluição visual em escalas continentais/regionais exibindo apenas siglas ou
+ * rótulos suprimidos, e expande progressivamente os metadados técnicos (categoria,
+ * esfera administrativa e área em hectares) conforme o usuário aproxima o mapa.
+ */
+
+var escalaAtual = $view.scale;
+var sigla = DefaultValue($feature.sigla_uc, "");
+var nome = Proper(DefaultValue($feature.nome_uc, ""), "firstword");
+var esfera = Upper(DefaultValue($feature.esfera_gestao, "FEDERAL"));
+var grupo = Upper(DefaultValue($feature.grupo_snuc, "PI")); // PI = Proteção Integral | US = Uso Sustentável
+var areaHa = DefaultValue($feature.area_oficial_ha, 0);
+
+// 1. Escala Macro (> 1:2.500.000): rotula apenas unidades territoriais de grande porte (> 100 mil ha)
+if (escalaAtual > 2500000) {
+    if (areaHa < 100000) {
+        return "";
+    }
+    return IIf(!IsEmpty(sigla), sigla, Left(nome, 18));
+}
+
+// 2. Escala Regional (1:500.000 a 1:2.500.000): Nome compacto + Grupo SNUC
+if (escalaAtual > 500000) {
+    if (areaHa < 10000) {
+        return "";
+    }
+    return nome + " [" + grupo + "]";
+}
+
+// 3. Escala Intermediária / Local (<= 1:500.000): Bloco técnico completo multilinha
+var linha1 = IIf(!IsEmpty(sigla), sigla + " — " + nome, nome);
+var linha2 = esfera + " · SNUC " + grupo + " · " + Text(areaHa, "#,###") + " ha";
+
+return linha1 + TextFormatting.NewLine + linha2;
